@@ -4,13 +4,16 @@
 using namespace std;
 
 const float APThreshold = -30; // mv, spike threshold
-const int amplitude = -50; // pA, maximum amplitude of the injected SK current
-const float tau = 0.01; // sec, decay time of the exponential
+const int amplitude = -150; // pA, maximum amplitude of the injected SK current
+const float tau = 0.50; // sec, decay time of the exponential
 const float plateau = 0.01; // sec, time to keep the current at its plateau before exponential rise
-const int cutoff = 7450; // cutoff index of the negative current
 const int samplingRate = 13600; // sampling rate, tuned to match the acquisition
 const float startTime = 0.002; // delay onset of the negative currents
-const float tsDuration = 0.55; // duration of the exponential time series
+const float tsDuration = 5.5; // duration of the exponential time series
+const int factor = 10; // sampling factor, helpful when tsDuration is too long (> 0.5 seconds)
+const int cutoff = samplingRate * tsDuration - 2*factor; // cutoff index of the negative current
+
+
 
 // Parameters for DAC and ADC channels of Arduino
 const int modDACOut0 = 1; // this DAC channel will generate artificial modulations
@@ -69,7 +72,8 @@ float *fakeSKExp( float duration, float startTime, float tau=0.1, float amplitud
     const int startIndex = bitRate * startTime;
     const int plateauIndex = bitRate * (startTime + plateauTime);
     float skArr[arrLength];
-    Serial.println("declared array");
+    Serial.print("declared array:");
+    Serial.println(arrLength);
     // looping over to create the SK current
     for (int a = 0; a < arrLength; a++) {
         if (a < startIndex){
@@ -91,7 +95,7 @@ void setup() {
   // fake SK current array
   Serial.println("Starting");
   //skArray = fakeSK(0.03, 0.01, 0.02, amplitude, samplingRate);
-  skArray = fakeSKExp(tsDuration, startTime, tau, amplitude, plateau, samplingRate);
+  skArray = fakeSKExp(tsDuration, startTime, tau, amplitude, plateau, samplingRate / factor);
   Serial.println("Ending");
 }
 
@@ -101,14 +105,24 @@ void loop() {
   vmOut = mapf(vmValue, 0, 65535, -100, 100); // the mapping is a guess. But very close. Might need to be fixed in actual experiments
   gateValue = analog.read(gateADCIn0);
   gateOut = round(gateValue / 65535.0);
+
+  if (factor > 1 && count >0 && count % factor != 0) {
+    count ++;
+    delayMicroseconds(20); // the if statements below probably takes this amount of time to execute
+    return;
+  }
   
   // Detect spikes (only when the gate is on)
   if (gateOut > 0.5 && count < cutoff) {
      if (vmOut > APThreshold){
-      if (count > 0){
-        count =  round(startTime * samplingRate); // reset bacak to the value at the onset of the current
+      if (count > 0){ // another spike was detected
+        count =  ceil(startTime * samplingRate / factor + 2 * factor); // reset bacak to the value at the onset of the current
       }
-      modWriteValue = mapf(skArray[count], -1000, 1000, 0, 65535);
+      modWriteValue = skArray[count/factor];
+      if (modWriteValue > 900 || modWriteValue < -900){
+        modWriteValue = 0;
+      }
+      modWriteValue = mapf(modWriteValue, -1000, 1000, 0, 65535);
       analog.write(modDACOut0, modWriteValue);
       count++;
      }
@@ -118,7 +132,11 @@ void loop() {
          analog.write(modDACOut0, modWriteValue);
       }
       else{ // if count > 0
-        modWriteValue = mapf(skArray[count], -1000, 1000, 0, 65535);
+        modWriteValue = skArray[count/factor];
+        if (modWriteValue > 900 || modWriteValue < -900){
+          modWriteValue = 0;
+        }
+        modWriteValue = mapf(modWriteValue, -1000, 1000, 0, 65535);
         analog.write(modDACOut0, modWriteValue); // keep going
         count++;
       }
