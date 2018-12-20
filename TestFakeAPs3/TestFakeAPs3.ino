@@ -4,16 +4,14 @@
 using namespace std;
 
 const float APThreshold = -30; // mv, spike threshold
-const int amplitude = -150; // pA, maximum amplitude of the injected SK current
-const float tau = 0.50; // sec, decay time of the exponential
+const int amplitude = -100; // pA, maximum amplitude of the injected SK current
+const float tau = 0.75; // sec, decay time of the exponential
 const float plateau = 0.01; // sec, time to keep the current at its plateau before exponential rise
 const int samplingRate = 13600; // sampling rate, tuned to match the acquisition
 const float startTime = 0.002; // delay onset of the negative currents
 const float tsDuration = 5.5; // duration of the exponential time series
 const int factor = 10; // sampling factor, helpful when tsDuration is too long (> 0.5 seconds)
-const int cutoff = samplingRate * tsDuration - 2*factor; // cutoff index of the negative current
-
-
+const int cutoff =  samplingRate * tsDuration - 2*factor;//samplingRate*(startTime+0.25); // // samplingRate*(startTime+0.25); cutoff index of the negative current,3400, 4760, 6120
 
 // Parameters for DAC and ADC channels of Arduino
 const int modDACOut0 = 1; // this DAC channel will generate artificial modulations
@@ -119,7 +117,7 @@ void loop() {
         count =  ceil(startTime * samplingRate / factor + 2 * factor); // reset bacak to the value at the onset of the current
       }
       modWriteValue = skArray[count/factor];
-      if (modWriteValue > 900 || modWriteValue < -900){
+      if (modWriteValue > 600 || modWriteValue < -600){
         modWriteValue = 0;
       }
       modWriteValue = mapf(modWriteValue, -1000, 1000, 0, 65535);
@@ -133,7 +131,7 @@ void loop() {
       }
       else{ // if count > 0
         modWriteValue = skArray[count/factor];
-        if (modWriteValue > 900 || modWriteValue < -900){
+        if (modWriteValue > 600 || modWriteValue < -600){
           modWriteValue = 0;
         }
         modWriteValue = mapf(modWriteValue, -1000, 1000, 0, 65535);
