@@ -8,10 +8,11 @@ const int amplitude = -50; // pA, maximum amplitude of the injected SK current
 const float tau = 1; // sec, decay time of the exponential
 const float plateau = 0.01; // sec, time to keep the current at its plateau before exponential rise
 const int samplingRate = 13600; // sampling rate, tuned to match the acquisition
-const float startTime = 0.002; // delay onset of the negative currents
+const float startTime = 0.1; // delay onset of the negative currents
 const float tsDuration = 5.5; // duration of the exponential time series
 const int factor = 10; // sampling factor, helpful when tsDuration is too long (> 0.5 seconds)
 const int cutoff =  samplingRate * tsDuration - 2*factor;//samplingRate*(startTime+0.25); // // samplingRate*(startTime+0.25); cutoff index of the negative current,3400, 4760, 6120
+const int delayDur = startTime * samplingRate / factor * 0.8; // delay index
 
 // Parameters for DAC and ADC channels of Arduino
 const int modDACOut0 = 1; // this DAC channel will generate artificial modulations
@@ -24,10 +25,15 @@ int gateValue = 0; // Gate value
 float vmOut = 0; // converted Vm
 int gateOut = 0; // converted gate (binary)
 int modWriteValue = 0; // value to be written for the DAC output
+int numSpikes = 0; // number of spikes detected
+int numHypol = 0; // number of hyperpolarization executed
 
 // Array to store negative stim;
 float* skArray; // initialize to track the injected SK current
-int count = 0; // counting if the array has been exhausted
+int index = 0; // indexing if the array has been exhausted
+int delayCount = 0; // where to end the delay on the array
+int delayCount = 0; // indexing delays
+bool spikeDetected = false; // recording if the spike detected
 
 double mapf(double x, double in_min, double in_max, double out_min, double out_max)
 {   
@@ -104,46 +110,51 @@ void loop() {
   gateValue = analog.read(gateADCIn0);
   gateOut = round(gateValue / 65535.0);
 
-  if (factor > 1 && count >0 && count % factor != 0) {
-    count ++;
+  if (factor > 1 && index >0 && index % factor != 0) {
+    index ++;
+    if (delayCount > 0){
+      delayCount ++; // if already kicked off, keep going
+    }
     delayMicroseconds(20); // the if statements below probably takes this amount of time to execute
     return;
   }
   
   // Detect spikes (only when the gate is on)
-  if (gateOut > 0.5 && count < cutoff) {
-     if (vmOut > APThreshold){
-      if (count > 0){ // another spike was detected
-        count =  ceil(startTime * samplingRate / factor + 2 * factor); // reset bacak to the value at the onset of the current
+  if (gateOut > 0.5 && index < cutoff) {
+     if (vmOut > APThreshold){ // crossed the threshold. Spike is detected
+      if (index > 0){ // already in the process of hyperpolarization
+          delayCount ++;          
+          index =  ceil(startTime * samplingRate / factor + 50 * factor); // reset bacak to the value at the onset of the current
       }
-      modWriteValue = skArray[count/factor];
+      modWriteValue = skArray[index/factor];
       if (modWriteValue > 600 || modWriteValue < -600){
         modWriteValue = 0;
       }
       modWriteValue = mapf(modWriteValue, -1000, 1000, 0, 65535);
       analog.write(modDACOut0, modWriteValue);
-      count++;
+      index++;
      }
      else { // if vmOut <= APThreshold
-      if (count == 0){
+      if (index == 0){
          modWriteValue = mapf(0, -1000, 1000, 0, 65535); // reset the value
          analog.write(modDACOut0, modWriteValue);
       }
-      else{ // if count > 0
-        modWriteValue = skArray[count/factor];
+      else{ // if index > 0, subthreshold, but reading the array
+        modWriteValue = skArray[index/factor];
         if (modWriteValue > 600 || modWriteValue < -600){
           modWriteValue = 0;
         }
         modWriteValue = mapf(modWriteValue, -1000, 1000, 0, 65535);
         analog.write(modDACOut0, modWriteValue); // keep going
-        count++;
+        index++;
       }
      }
   }
   else {
     modWriteValue = mapf(0, -1000, 1000, 0, 65535); // reset the value
     analog.write(modDACOut0, modWriteValue);
-    count = 0;  // reset
+    index = 0;  // reset
+    delayCount = 0; // reset
   }
   // delay(200); // delay for each print
 }
