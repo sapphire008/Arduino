@@ -100,21 +100,11 @@ void loop()
           spikeCount ++;
           delayCount = 0; // reset the delayCount at the offset of the spike
           delayCount ++; // this will kick off the delay
-          if (spikeCount==1){
-            //count = 0;
-          }
           count ++; // keep taking values          
           //Serial.print("Spike # ");
           //Serial.println(spikeCount);
         }
         else{ // subthreshold. This is where we inject the hyperpolarizing current
-          if (spikeCount <4){
-            //Serial.print(count);
-            //Serial.print(",");
-            //Serial.print(delayCount);
-            //Serial.print(",");
-            //Serial.print(modWriteValue); 
-          }
           if (count==0){ // not starting to exhuast the array yet
                 modWriteValue = mapf(0, -1000, 1000, 0, 65535); // reset the value
                 analog.write(modDACOut0, modWriteValue);
