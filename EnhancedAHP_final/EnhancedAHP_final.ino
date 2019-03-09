@@ -5,11 +5,11 @@ using namespace std;
 
 // Basic parameters
 const float APThreshold = -30; // mv, spike threshold
-const int amplitude = -50; // pA, maximum amplitude of the injected SK current
+const int amplitude = -150; // pA, maximum amplitude of the injected SK current
 const float tau = 1; // sec, decay time of the exponential
 const float plateau = 0.01; // sec, time to keep the current at its plateau before exponential rise
-const int samplingRate = 1000; // sampling rate, tuned to match the acquisition
-const float startTime = 0.05; // delay onset of the negative currents
+const int samplingRate = 1000; //sampling rate, tuned to match the acquisition
+const float startTime = 0.002; // delay onset of the negative currents
 const float tsDuration = 5.5; // duration of the exponential time series
 const int cutoff =  samplingRate * tsDuration; // // samplingRate*(startTime+0.25); cutoff index of the negative current,3400, 4760, 6120
 const int delayIndex = startTime * samplingRate - 1; // delay this many indices
